@@ -101,6 +101,17 @@ def save_cache(cache_path, tmp_path, git_dir):
     proc.run(["tar", "-cf", tmp_path, "."], check=True, cwd=dot_git_dir, stderr=DEVNULL, stdin=DEVNULL, stdout=DEVNULL)
     shutil.copyfile(tmp_path, cache_path)
 
+def is_dir_empty(path):
+    if os.path.exists(path) and os.path.isdir(path):
+        # Checking if the directory is empty or not
+        if not os.listdir(path):
+            return True
+        else:
+            return False
+    else:
+        print("The path is either for a file or not valid")
+        return False
+
 
 def sync_github_mirror(github_repo, cache_dir, new_svn_url=None):
     if cache_dir:
@@ -112,11 +123,14 @@ def sync_github_mirror(github_repo, cache_dir, new_svn_url=None):
 
     github_url = "git@github.com:" + github_repo + ".git"
 
-    with tempfile.TemporaryDirectory(prefix="svn2github-") as tmp_dir:
+    #with tempfile.TemporaryDirectory(prefix="svn2github-") as tmp_dir:
+    tmp_dir="/ssd_disk4/projects/vbox/vbox-mirror"
+    if os.path.exists(tmp_dir):
         git_dir = os.path.join(tmp_dir, "repo")
         if cached and not new_svn_url:
-            print("Using cached Git repository from " + cache_path)
-            unpack_cache(cache_path, git_dir)
+            if is_dir_empty(git_dir):
+                print("Using cached Git repository from " + cache_path)
+                unpack_cache(cache_path, git_dir)
         else:
             print("Cloning " + github_url)
             git_clone(github_url, git_dir)
@@ -141,8 +155,13 @@ def sync_github_mirror(github_repo, cache_dir, new_svn_url=None):
         if not cached or new_svn_url:
             git_svn_init(git_svn_info, git_dir)
 
-        for rev in git_svn_fetch(git_dir):
-            print("\rFetching from SVN, revision {}/{}".format(rev, upstream_revision), end="")
+        rev = int(0)
+        try_count = int(0)
+        while (rev != upstream_revision):
+            print("Trying fetch count: {}".format(try_count))
+            for rev in git_svn_fetch(git_dir):
+                print("\rFetching from SVN, revision {}/{}".format(rev, upstream_revision), end="")
+            try_count += 1
         print()
 
         print("Rebasing SVN changes")
